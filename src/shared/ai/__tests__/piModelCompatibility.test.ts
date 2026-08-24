@@ -146,7 +146,7 @@ describe('endpoint candidate walk (#19184)', () => {
       }
     })
     // First declared endpoint (ollama) has no pi protocol; the second does.
-    const model = makeModel({ endpointTypes: ['ollama', 'openai-chat-completions'] })
+    const model = makeModel({ endpointTypes: ['ollama-chat', 'openai-chat-completions'] })
     expect(resolvePiApi(provider, model)).toBe('openai-completions')
     expect(isPiCompatibleModel(provider, model)).toBe(true)
   })
@@ -177,11 +177,25 @@ describe('endpoint candidate walk (#19184)', () => {
     ).toBe('anthropic-messages')
   })
 
+  it('shares Pi runtime Anthropic preference for dual OpenAI Chat/Anthropic models', () => {
+    const provider = makeProvider({
+      defaultChatEndpoint: 'openai-chat-completions',
+      endpointConfigs: {
+        'openai-chat-completions': { adapterFamily: 'openai-compatible' },
+        'anthropic-messages': { adapterFamily: 'anthropic', baseUrl: 'https://gateway.example.com' }
+      }
+    })
+
+    expect(
+      resolvePiApi(provider, makeModel({ endpointTypes: ['openai-chat-completions', 'anthropic-messages'] }))
+    ).toBe('anthropic-messages')
+  })
+
   it('returns undefined when no candidate maps', () => {
     const provider = makeProvider({
       defaultChatEndpoint: 'openai-chat-completions',
       endpointConfigs: { 'openai-chat-completions': { adapterFamily: 'azure' } }
     })
-    expect(resolvePiApi(provider, makeModel({ endpointTypes: ['ollama'] }))).toBeUndefined()
+    expect(resolvePiApi(provider, makeModel({ endpointTypes: ['ollama-chat'] }))).toBeUndefined()
   })
 })

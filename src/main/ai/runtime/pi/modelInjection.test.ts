@@ -149,6 +149,22 @@ describe('buildPiProviderInjection', () => {
     expect(injection.providerConfig.api).toBe('openai-completions')
   })
 
+  it('uses the same later mappable endpoint accepted by the shared Pi filter', () => {
+    const provider = makeProvider({
+      defaultChatEndpoint: 'openai-chat-completions',
+      endpointConfigs: {
+        'ollama-chat': { adapterFamily: 'ollama', baseUrl: 'http://localhost:11434' },
+        'openai-chat-completions': { adapterFamily: 'openai-compatible', baseUrl: 'https://gateway.example.com' }
+      }
+    })
+    const model = makeModel({ endpointTypes: ['ollama-chat', 'openai-chat-completions'] })
+
+    const injection = buildPiProviderInjection(provider, model, REAL_KEY)
+
+    expect(injection.providerConfig.api).toBe('openai-completions')
+    expect(injection.providerConfig.baseUrl).toBe('https://gateway.example.com/v1')
+  })
+
   it('maps an OpenAI-compatible provider (chat-completions)', () => {
     const provider = makeProvider({
       id: 'deepseek',

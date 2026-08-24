@@ -15,12 +15,17 @@ import type { AiUsageCredentialReceipt } from '@data/services/AiUsageRecordServi
 import { modelService } from '@data/services/ModelService'
 import { providerService } from '@data/services/ProviderService'
 import type { ProviderConfig, ProviderModelConfig } from '@earendil-works/pi-coding-agent'
+import { getBaseUrl } from '@main/ai/utils/provider'
 import { createAiUsagePricingSnapshot } from '@main/ai/utils/usageCapture'
-import { hasKnownPiContextWindow, mapEndpointToPiApi, type PiApi } from '@shared/ai/piModelCompatibility'
+import {
+  hasKnownPiContextWindow,
+  mapEndpointToPiApi,
+  type PiApi,
+  resolvePiEndpointType
+} from '@shared/ai/piModelCompatibility'
 import { isCodexProviderId } from '@shared/data/presets/codex'
 import { hasRuntimeTransportAdapter } from '@shared/data/presets/runtimeTransport'
 import {
-  ENDPOINT_TYPE,
   type EndpointType,
   MODALITY,
   type Model,
@@ -33,7 +38,6 @@ import { formatApiHost, withoutTrailingApiVersion } from '@shared/utils/api'
 import { getRawModelId } from '@shared/utils/model'
 import { isLoginBasedProvider, resolveEndpointDialect } from '@shared/utils/provider'
 
-import { resolveEffectiveEndpoint } from '../../provider/endpoint'
 import { getProviderTransportAdapter, type ProviderTransportAdapter } from '../../provider/runtimeTransport'
 import type { AgentSessionUsageCapture } from '../types'
 import { loadPiAnthropicMessagesApi, loadPiApiStreamSimple } from './piSdk'
@@ -124,12 +128,8 @@ export async function materializePiProviderStream(injection: PiProviderInjection
 }
 
 function resolvePiEndpoint(provider: Provider, model: Model) {
-  const preferredEndpoint =
-    model.endpointTypes?.includes(ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS) &&
-    model.endpointTypes.includes(ENDPOINT_TYPE.ANTHROPIC_MESSAGES)
-      ? ENDPOINT_TYPE.ANTHROPIC_MESSAGES
-      : undefined
-  return resolveEffectiveEndpoint(provider, model, preferredEndpoint)
+  const endpointType = resolvePiEndpointType(provider, model)
+  return { endpointType, baseUrl: getBaseUrl(provider, endpointType) }
 }
 
 /**

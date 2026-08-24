@@ -90,17 +90,19 @@ export function mapEndpointToPiApi(
 }
 
 /**
- * The effective chat endpoint the runtime would use: the model's first
- * declared endpoint, else the provider default. Mirrors
- * `resolveEffectiveEndpoint`'s endpoint selection (kept pure here so the
- * renderer, which has no main-only resolver, can reuse it).
- */
-/**
- * Chat endpoints to consider for a model, in preference order: the model's
- * declared endpoints first, then the gateway route, then the provider default.
+ * Chat endpoints to consider for a model, in preference order: Pi's Anthropic
+ * preference for dual OpenAI Chat/Anthropic models first, then declared model
+ * endpoints, then the gateway route, then the provider default.
  */
 function candidateEndpointTypes(provider: Provider, model: Model): EndpointType[] {
-  const candidates: EndpointType[] = [...(model.endpointTypes ?? [])]
+  const preferredEndpoint =
+    model.endpointTypes?.includes(ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS) &&
+    model.endpointTypes.includes(ENDPOINT_TYPE.ANTHROPIC_MESSAGES) &&
+    provider.endpointConfigs?.[ENDPOINT_TYPE.ANTHROPIC_MESSAGES]?.baseUrl
+      ? ENDPOINT_TYPE.ANTHROPIC_MESSAGES
+      : undefined
+  const candidates: EndpointType[] = preferredEndpoint ? [preferredEndpoint] : []
+  candidates.push(...(model.endpointTypes ?? []))
   const gateway = resolveGatewayChatRoute(provider, model)?.endpointType
   if (gateway) candidates.push(gateway)
   if (provider.defaultChatEndpoint) candidates.push(provider.defaultChatEndpoint)
@@ -109,11 +111,12 @@ function candidateEndpointTypes(provider: Provider, model: Model): EndpointType[
 
 /**
  * The effective chat endpoint the pi runtime uses. Preference order is kept,
- * but a declared endpoint with no pi protocol no longer hides a later declared
- * endpoint that has one (#19184): the model's first endpoint is used when it
- * maps, else the first declared endpoint that does, else the first candidate.
+ * but a declared endpoint with no pi protocol no longer hides a later
+ * candidate that has one (#19184): the first mappable candidate wins, and when
+ * none map the first candidate is preserved so unsupported-provider errors stay
+ * anchored to the same endpoint family.
  */
-function resolveEndpointType(provider: Provider, model: Model): EndpointType | undefined {
+export function resolvePiEndpointType(provider: Provider, model: Model): EndpointType | undefined {
   const candidates = candidateEndpointTypes(provider, model)
   if (candidates.length === 0) return undefined
   for (const candidate of candidates) {
@@ -133,7 +136,7 @@ export function resolvePiApi(provider: Provider, model: Model): PiApi | undefine
   // injects their OAuth token + provider headers + payload rewrite per request —
   // so they ARE drivable and fall through to the normal endpoint mapping.
   if (isLoginBasedProvider(provider) && !hasRuntimeTransportAdapter(provider.id)) return undefined
-  const endpointType = resolveEndpointType(provider, model)
+  const endpointType = resolvePiEndpointType(provider, model)
   const adapterFamily = endpointType ? provider.endpointConfigs?.[endpointType]?.adapterFamily : undefined
   return mapEndpointToPiApi(endpointType, adapterFamily)
 }
