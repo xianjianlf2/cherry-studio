@@ -86,7 +86,7 @@ describe('endpoint candidate walk (#19184)', () => {
         'openai-chat-completions': { adapterFamily: 'openai-compatible' }
       }
     })
-    const model = makeModel({ endpointTypes: ['ollama', 'openai-chat-completions'] })
+    const model = makeModel({ endpointTypes: ['ollama-chat', 'openai-chat-completions'] })
     expect(resolveDshApi(provider, model)).toBe('openai-completions')
     expect(isDshCompatibleModel(provider, model)).toBe(true)
   })

@@ -146,7 +146,7 @@ describe('endpoint candidate walk (#19184)', () => {
       }
     })
     // First declared endpoint (ollama) has no pi protocol; the second does.
-    const model = makeModel({ endpointTypes: ['ollama', 'openai-chat-completions'] })
+    const model = makeModel({ endpointTypes: ['ollama-chat', 'openai-chat-completions'] })
     expect(resolvePiApi(provider, model)).toBe('openai-completions')
     expect(isPiCompatibleModel(provider, model)).toBe(true)
   })
@@ -182,6 +182,6 @@ describe('endpoint candidate walk (#19184)', () => {
       defaultChatEndpoint: 'openai-chat-completions',
       endpointConfigs: { 'openai-chat-completions': { adapterFamily: 'azure' } }
     })
-    expect(resolvePiApi(provider, makeModel({ endpointTypes: ['ollama'] }))).toBeUndefined()
+    expect(resolvePiApi(provider, makeModel({ endpointTypes: ['ollama-chat'] }))).toBeUndefined()
   })
 })
