@@ -14,6 +14,7 @@ import type { ReasoningEffort } from '@cherrystudio/provider-registry'
 import type { AiUsageCredentialReceipt } from '@data/services/AiUsageRecordService'
 import { modelService } from '@data/services/ModelService'
 import { providerService } from '@data/services/ProviderService'
+import { getBaseUrl } from '@main/ai/utils/provider'
 import { createAiUsagePricingSnapshot } from '@main/ai/utils/usageCapture'
 import {
   type DshApi,
@@ -30,7 +31,6 @@ import { formatGatewayModelId } from '@shared/utils/apiGateway'
 import { getRawModelId, isGatewayRoutableModel, isReasoningModel, isVisionModel } from '@shared/utils/model'
 import { isLoginBasedProvider } from '@shared/utils/provider'
 
-import { resolveEffectiveEndpoint } from '../../provider/endpoint'
 import { ApiGatewayNotRunningError, resolveApiGatewayRuntime } from '../agentApiGateway'
 import type { AgentSessionUsageCapture } from '../types'
 
@@ -172,7 +172,8 @@ export interface DshProviderInjection {
 }
 
 function resolveDshEndpoint(provider: Provider, model: Model) {
-  return resolveEffectiveEndpoint(provider, model, resolveDshEndpointType(provider, model))
+  const endpointType = resolveDshEndpointType(provider, model)
+  return { endpointType, baseUrl: getBaseUrl(provider, endpointType) }
 }
 
 /**

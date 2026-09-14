@@ -1,3 +1,4 @@
+import { isDshCompatibleModel, resolveDshApi } from '@shared/ai/dshModelCompatibility'
 import { ENDPOINT_TYPE, type Model } from '@shared/data/types/model'
 import type { Provider } from '@shared/data/types/provider'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -146,6 +147,65 @@ describe('buildDshGatewayInjection', () => {
 })
 
 describe('resolveDshProviderInjectionFromSnapshot', () => {
+  it.each([
+    {
+      name: 'a later declared endpoint with its own base URL',
+      endpointTypes: [ENDPOINT_TYPE.OLLAMA_CHAT, ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS],
+      providerOverrides: {},
+      api: 'openai-completions',
+      baseUrl: 'https://api.deepseek.com/v1'
+    },
+    {
+      name: 'a later declared endpoint using the provider base URL fallback',
+      endpointTypes: [ENDPOINT_TYPE.OLLAMA_CHAT, ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS],
+      providerOverrides: {
+        defaultChatEndpoint: ENDPOINT_TYPE.ANTHROPIC_MESSAGES,
+        endpointConfigs: {
+          [ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS]: { adapterFamily: 'openai-compatible' },
+          [ENDPOINT_TYPE.ANTHROPIC_MESSAGES]: { adapterFamily: 'anthropic', baseUrl: 'https://relay.example.com' }
+        }
+      },
+      api: 'openai-completions',
+      baseUrl: 'https://relay.example.com/v1'
+    },
+    {
+      name: 'the provider default absent from the declared endpoints',
+      endpointTypes: [ENDPOINT_TYPE.OPENAI_EMBEDDINGS],
+      providerOverrides: {
+        defaultChatEndpoint: ENDPOINT_TYPE.ANTHROPIC_MESSAGES,
+        endpointConfigs: {
+          [ENDPOINT_TYPE.ANTHROPIC_MESSAGES]: { adapterFamily: 'anthropic', baseUrl: 'https://relay.example.com' }
+        }
+      },
+      api: 'anthropic-messages',
+      baseUrl: 'https://relay.example.com'
+    }
+  ])('materializes $name accepted by the shared filter without a gateway', async (testCase) => {
+    const provider: Provider = { ...nativeProvider, ...testCase.providerOverrides }
+    const model = makeModel({
+      id: 'deepseek::deepseek-chat',
+      providerId: 'deepseek',
+      apiModelId: 'deepseek-chat',
+      endpointTypes: testCase.endpointTypes
+    })
+    mocks.getByProviderId.mockResolvedValue(provider)
+    mocks.getByKey.mockResolvedValue(model)
+    mocks.getApiKeys.mockReturnValue([{ key: 'sk-native', enabled: true }])
+    mocks.getCurrentConfig.mockReturnValue({ enabled: false })
+
+    expect(isDshCompatibleModel(provider, model)).toBe(true)
+    expect(resolveDshApi(provider, model)).toBe(testCase.api)
+
+    const injection = await resolveDshProviderInjectionFromSnapshot('session-1', provider, model)
+
+    expect(injection.api).toBe(testCase.api)
+    expect(injection.baseUrl).toBe(testCase.baseUrl)
+    expect(injection.apiKey).toBe('sk-native')
+    expect(injection.usageCapture).toMatchObject({ owner: 'agent-sdk', providerId: 'deepseek' })
+    expect(mocks.resolveApiGatewayRuntime).not.toHaveBeenCalled()
+    await expect(assertDshProviderUsable('deepseek::deepseek-chat')).resolves.toBeUndefined()
+  })
+
   it('keeps native providers on the native route with agent-sdk usage capture', async () => {
     const model = makeModel({
       id: 'deepseek::deepseek-chat',
